@@ -1,6 +1,9 @@
 <template>
-  <div class="min-h-screen bg-gray-100 p-6">
-    <h1 class="text-2xl font-bold mb-6">Admin – Afspraken</h1>
+  <div class="page h-screen bg-gray-100 p-8 flex flex-col overflow-hidden">
+    <h1 class="text-2xl font-bold mb-6 text-center">Afspraken</h1>
+    <button @click="showBottomPanel = true" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">
+      Gesloten Dagen
+    </button>
 
     <div v-if="authError" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
       {{ authError }}
@@ -8,53 +11,56 @@
 
     <div v-if="loading" class="text-center">Laden…</div>
 
-    <div v-else-if="!authError">
+    <div v-else-if="!authError" class="flex-1 overflow-y-auto">
+
       <div v-for="(dayAppointments, date) in groupedAppointments" :key="date" class="mb-6">
-        <h2 class="text-xl font-semibold mb-2">
-          📅 {{ formatDate(date) }}
+
+        <!-- Klikbare dag -->
+        <h2 @click="toggleDay(date)" class="text-xl text-center font-semibold mb-2 cursor-pointer"
+          :class="{ 'text-green-600 underline': isToday(date) }">
+          {{ formatDate(date) }}
         </h2>
 
-        <div v-for="a in dayAppointments" :key="a.id" class="bg-white p-4 rounded shadow mb-2 flex justify-between">
-          <div>
-            <p class="font-semibold">{{ a.time }} – {{ a.name }}</p>
-            <p class="text-sm text-gray-600">
-              {{ a.service }} · {{ a.phone }}
-            </p>
-            <p class="text-sm text-gray-500">
+        <!-- Afspraken dropdown -->
+        <div v-if="openDays[date]">
+
+          <div v-for="a in dayAppointments" :key="a.id" class="bg-white p-4 rounded shadow mb-2">
+            <p class="font-semibold text-center">{{ a.time }}</p>
+            <p class="text-sm text-gray-600">Naam: <strong>{{ a.name }}</strong></p>
+            <p class="text-sm text-gray-600">Telefoonnummer: <strong>{{ a.phone }}</strong></p>
+            <p class="text-sm text-gray-600">Service type: <strong>{{ a.service }}</strong></p>
+            <hr>
+            <p class="text-sm text-center text-gray-500 bg-gray-200">
+              <strong>Opmerkingen:</strong><br>
               {{ a.notes || 'Geen opmerkingen' }}
             </p>
+            <br>
+
+            <div class="flex gap-2">
+              <button @click="openEdit(a)"
+                class="text-green-600 w-full border-2 border-green-600 hover:bg-green-500 hover:text-white">
+                Edit
+              </button>
+
+              <button @click="remove(a.id)"
+                class="text-red-600 w-full border-2 border-red-600 hover:bg-red-500 hover:text-white">
+                Delete
+              </button>
+            </div>
+
           </div>
-          <button @click="openEdit(a)" class="text-blue-600">✏️</button>
-          <button @click="remove(a.id)" class="text-red-600 ml-2">🗑</button>
+
         </div>
+
+        <hr>
       </div>
+
     </div>
   </div>
-  <div class="mt-10 border-t pt-6">
-    <h2 class="text-xl font-bold mb-4">Gesloten Dagen</h2>
-
-    <div class="flex gap-2 mb-4">
-      <input type="date" v-model="newClosedDate" class="border p-2" />
-      <button @click="closeDay" class="bg-red-600 text-white px-3 py-1 rounded">
-        Sluit Dag
-      </button>
-    </div>
-
-    <div class="grid gap-2">
-      <div v-for="day in closedDays" :key="day.id" class="flex justify-between items-center bg-gray-100 p-2 rounded">
-
-        <span>{{ day.date }}</span>
-
-        <button @click="openDay(day.date)" class="bg-green-600 text-white px-2 py-1 rounded">
-          Open
-        </button>
-      </div>
-    </div>
-  </div>
-  <div v-if="showEditModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div v-if="showEditModal" class="p-8 fixed inset-0 bg-black/50 flex items-center justify-center z-50">
     <div class="bg-white p-6 rounded shadow w-96">
 
-      <h2 class="text-xl font-bold mb-4">Afspraak Bewerken</h2>
+      <h2 class="text-xl font-bold mb-4 text-center">Afspraak Bewerken</h2>
 
       <div class="grid gap-3">
         <input type="date" v-model="editForm.date" class="border p-2" />
@@ -75,7 +81,7 @@
         <textarea v-model="editForm.notes" class="border p-2"></textarea>
       </div>
 
-      <div class="flex justify-end gap-2 mt-4">
+      <div class="flex gap-2 mt-4">
         <button @click="showEditModal = false" class="bg-gray-300 px-3 py-1 rounded">
           Annuleren
         </button>
@@ -87,12 +93,55 @@
 
     </div>
   </div>
+
+  <!-- Overlay -->
+  <div v-if="showBottomPanel" class="fixed inset-0 bg-black/40 z-40" @click="showBottomPanel = false"></div>
+
+  <!-- Bottom Slide Panel -->
+  <div
+    class="fixed bottom-0 left-0 w-full bg-white rounded-t-2xl shadow-2xl z-50 transform transition-transform duration-300"
+    :class="showBottomPanel ? 'translate-y-0' : 'translate-y-full'">
+    <div class="p-6 max-h-[70vh] overflow-y-auto">
+
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-center">Gesloten Dagen</h2>
+        <button @click="showBottomPanel = false" class="text-gray-500">✕</button>
+      </div>
+
+      <div class="flex gap-2 mb-4">
+        <input type="date" v-model="newClosedDate" class="border p-2 flex-1" />
+        <button @click="closeDay" class="bg-red-600 text-white px-3 py-1 rounded">
+          Sluit
+        </button>
+      </div>
+
+      <div class="grid gap-2">
+        <div v-for="day in closedDays" :key="day.id" class="flex justify-between items-center bg-gray-100 p-2 rounded">
+          <span>{{ day.date }}</span>
+          <button @click="openDay(day.date)" class="bg-green-600 text-white px-2 py-1 rounded">
+            Open
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
 </template>
+
+<style scoped>
+@media (min-width: 768px) {
+  .page {
+    width: 90% !important;
+
+  }
+}
+</style>
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+const showBottomPanel = ref(false)
 const route = useRoute()
 const router = useRouter()
 
@@ -105,7 +154,11 @@ const editForm = ref(null)
 const closedDays = ref([])
 const newClosedDate = ref('')
 const authError = ref('')
+const openDays = ref({})
 
+const toggleDay = (date) => {
+  openDays.value[date] = !openDays.value[date]
+}
 // Check token in URL
 if (route.query.token) {
   ADMIN_TOKEN = route.query.token
@@ -263,4 +316,22 @@ const openDay = async (date) => {
 
   await fetchClosedDays()
 }
+
+const isToday = (date) => {
+  const today = new Date()
+  const d = new Date(date)
+
+  return (
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate()
+  )
+}
+watch(groupedAppointments, (groups) => {
+  for (const date in groups) {
+    if (isToday(date)) {
+      openDays.value[date] = true
+    }
+  }
+})
 </script>
