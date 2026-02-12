@@ -22,6 +22,10 @@ const router = createRouter({
       name: 'MijnAfspraken',
       component: () => import('../views/MijnAfspraken.vue'),
     },
+    {
+      path: '/admin',
+      component: () => import('@/views/AdminAppointments.vue')
+    }
   ],
 })
 
